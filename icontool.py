@@ -19,10 +19,13 @@ def test():
     print("✅ Cairo 库安装成功，绘图测试通过！")
 
 
-def convert_svg_to_ico(svg_path, ico_path, sizes=None):
+def convert_svg_to_ico(svg_path, ico_path=None, sizes=None):
     # 将 SVG 转成 PNG
     if sizes is None:
         sizes = [(256, 256)]
+    if ico_path is None:
+        ico_path = svg_path.replace(".svg", ".ico")
+
     png_path = svg_path.replace(".svg", ".png")
     cairosvg.svg2png(url=svg_path, write_to=png_path)
 
@@ -35,6 +38,5 @@ def convert_svg_to_ico(svg_path, ico_path, sizes=None):
     print(f"✅ 成功生成图标: {ico_path}")
 
 
-# 使用示例
-convert_svg_to_ico("icon/q_dlp.svg", "icon/q_dlp.ico",
-                   sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+svg_path = "icon/run.svg"
+convert_svg_to_ico(svg_path, sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])

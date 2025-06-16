@@ -1,14 +1,216 @@
+import logging
 import os
+import re
+from typing import Optional
 
-from PyQt6.QtCore import pyqtSlot
-from PyQt6.QtGui import QIcon
+from PyQt6.QtCore import QSize
+from PyQt6.QtGui import QIcon, QAction
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QLineEdit, QPushButton, QFileDialog, QMessageBox,
-    QTextEdit, QComboBox, QProgressBar
+    QMainWindow, QWidget, QVBoxLayout, QLineEdit, QToolBar, QListWidget, QSizePolicy, QDialog, QDialogButtonBox
 )
 
-from dlp import DownloadThread
+from db import DownloadRecord, clear_downloads_at_db, gen_id, get_all_downloads_at_db
+
+
+def url_checker(url: str) -> Optional[str]:
+    """
+    检查输入的 URL 是否为有效的 Bilibili 或 YouTube 链接。
+    返回:
+        'bilibili' | 'youtube' 如果合法
+        None 如果无效
+    """
+    url = url.strip()
+
+    # YouTube: 支持 youtu.be 和 youtube.com
+    youtube_patterns = [
+        r'^https?://(www\.)?youtube\.com/watch\?v=[\w-]+',
+        r'^https?://youtu\.be/[\w-]+'
+    ]
+
+    # Bilibili: 支持 www.bilibili.com/video/BVxxx 和 avxxx
+    bilibili_patterns = [
+        r'^https?://(www\.)?bilibili\.com/video/(BV[\w]+)',
+        r'^https?://(www\.)?bilibili\.com/video/(av\d+)',
+        r'^https?://b23\.tv/[\w]+'
+    ]
+
+    for pattern in youtube_patterns:
+        if re.match(pattern, url):
+            return 'youtube'
+
+    for pattern in bilibili_patterns:
+        if re.match(pattern, url):
+            return 'bilibili'
+
+    return None
+
+
+class DownloadTaskListWidget(QListWidget):
+    """
+    自定义的 QListWidget，用于显示下载任务列表。
+    可以在此基础上添加更多功能，如右键菜单、拖拽排序等。
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setObjectName("DListWidget")
+        self.setStyleSheet("""
+            QListWidget#DListWidget {
+                background-color: #f0f0f0;
+                border: 1px solid #dcdcdc;
+                border-radius: 1px;
+            }
+        """)
+
+        self.download_records: list[DownloadRecord] = []
+        for record in get_all_downloads_at_db():
+            self.download_records.append(record)
+            self.addItem(f"[已加载] {record.url}")
+        clear_downloads_at_db()
+        logging.info("已加载下载记录: %d 条", len(self.download_records))
+
+    def add_download_record(self, record: DownloadRecord):
+        """
+        添加下载记录到列表和数据库。
+        :param record: DownloadRecord 实例
+        """
+        self.download_records.append(record)
+        self.addItem(f"[已加入] {record.url}")
+        logging.info("添加下载记录: %s", record)
+
+    def add_url_to_records(self, url: str):
+        """
+        添加下载记录到列表和数据库。
+        """
+        record = DownloadRecord(id=gen_id(), url=url)
+        self.download_records.append(record)
+        self.addItem(f"[已加入] {record.url}")
+        logging.info("添加下载记录: %s", record)
+
+    def save_download_records_on_app_exit(self):
+        """
+        应用退出时保存下载记录到数据库。
+        """
+        if not self.download_records:
+            return
+
+        for record in self.download_records:
+            try:
+                record.insert_to_db()
+                logging.info("已保存下载记录: %s", record)
+            except Exception as e:
+                logging.error("保存下载记录失败: %s", e)
+
+
+class MToolbarWidget(QWidget):
+    def __init__(self, task_list: DownloadTaskListWidget, parent=None):
+        super().__init__(parent)
+        self.task_list = task_list
+        self.layout = QVBoxLayout(self)
+        self._create_toolbar()
+
+        self.setObjectName("toolbar")
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #f0f0f0;
+                border: 1px solid #dcdcdc;
+                border-radius: 1px;
+            }
+            QWidget#toolbar {
+                background-color: #16a4fa;
+                border-radius: 1px;
+            }
+            QToolButton {
+                background-color: #16a4fa;
+                border-radius: 1px;
+                padding: 4px;
+            }
+            QToolButton:hover {
+                background-color: #e6f7ff;
+                border-color: #40a9ff;
+            }
+        """)
+
+    def _create_toolbar(self):
+        toolbar = QToolBar("顶部工具栏")
+        toolbar.setIconSize(QSize(16, 16))
+
+        # 左侧按钮（顺序添加）
+        add_task_action = QAction(QIcon.fromTheme("list-add"), "添加任务", self)
+        add_task_action.triggered.connect(self.add_task_dialog)
+
+        run_task_action = QAction(QIcon.fromTheme("media-playback-start"), "开始下载", self)
+        pause_task_action = QAction(QIcon.fromTheme("media-playback-pause"), "暂停任务", self)
+        remove_task_action = QAction(QIcon.fromTheme("edit-delete"), "移除任务", self)
+
+        toolbar.addAction(add_task_action)
+        toolbar.addAction(run_task_action)
+        toolbar.addAction(pause_task_action)
+        toolbar.addAction(remove_task_action)
+
+        # 实现右对齐
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        toolbar.addWidget(spacer)
+
+        # 右侧按钮
+        search_action = QAction(QIcon.fromTheme("edit-find"), "查找任务", self)
+        settings_icon_path = os.path.join(os.path.dirname(__file__), 'icon', 'settings.ico')
+        settings_action = QAction(QIcon(settings_icon_path), "设置", self)
+
+        toolbar.addAction(search_action)
+        toolbar.addAction(settings_action)
+
+        self.layout.addWidget(toolbar)
+
+    def add_task_dialog(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("添加下载任务")
+        layout = QVBoxLayout()
+
+        url_input = QLineEdit()
+        url_input.setPlaceholderText("请输入视频 URL")
+        layout.addWidget(url_input)
+
+        button_box = QDialogButtonBox()
+        button_box.setStandardButtons(
+            QDialogButtonBox.StandardButton.Cancel |
+            QDialogButtonBox.StandardButton.Ok |
+            QDialogButtonBox.StandardButton.Apply
+        )
+        layout.addWidget(button_box)
+
+        dialog.setLayout(layout)
+
+        def on_button_clicked(button):
+            logging.info("button clicked: %s", button.text())
+
+            role = button_box.buttonRole(button)
+            url = url_input.text().strip()
+            url_type = url_checker(url)
+
+            if not url or not url_type:
+                logging.warning("无效的 URL: %s", url)
+                dialog.reject()
+                return
+
+            if role == QDialogButtonBox.ButtonRole.AcceptRole:  # Ok
+                self.task_list.addItem(f"[已加入] {url}")
+                logging.info("添加任务: %s", url)
+                dialog.accept()
+            elif role == QDialogButtonBox.ButtonRole.ApplyRole:  # Apply as "加入列表"
+                self.task_list.addItem(f"[等待下载] {url}")
+                logging.info("加入列表: %s", url)
+                dialog.accept()
+            else:
+                dialog.reject()
+
+        button_box.clicked.connect(on_button_clicked)
+        dialog.exec()
 
 
 class MainWindow(QMainWindow):
@@ -22,7 +224,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("q_dlp 下载器")
         icon_path = os.path.join(os.path.dirname(__file__), 'icon', 'q_dlp.ico')
         self.setWindowIcon(QIcon(icon_path))
-        self.resize(600, 450)
+        self.resize(500, 350)
 
         # 创建中央 Widget
         central_widget = QWidget()
@@ -30,142 +232,23 @@ class MainWindow(QMainWindow):
 
         # 垂直主布局
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(0, 0, 0, 0)
 
-        # ——— 第 1 行：URL 输入 ———
-        url_layout = QHBoxLayout()
-        lbl_url = QLabel("视频 URL：")
-        lbl_url.setMinimumWidth(70)
-        self.edit_url = QLineEdit()
-        self.edit_url.setPlaceholderText("在此输入 B 站或 YouTube 视频链接")
-        url_layout.addWidget(lbl_url)
-        url_layout.addWidget(self.edit_url)
-        main_layout.addLayout(url_layout)
+        self.top_tool_bar_task_list = DownloadTaskListWidget()
+        self.top_tool_bar = MToolbarWidget(self.top_tool_bar_task_list, self)
+        main_layout.addWidget(self.top_tool_bar)
+        main_layout.addWidget(self.top_tool_bar_task_list)
 
-        # ——— 第 2 行：保存目录选择 ———
-        path_layout = QHBoxLayout()
-        lbl_path = QLabel("保存目录：")
-        lbl_path.setMinimumWidth(70)
-        self.edit_path = QLineEdit()
-        self.edit_path.setPlaceholderText("下载目录")
-        btn_browse = QPushButton("浏览")
-        btn_browse.clicked.connect(self.on_browse)
-        path_layout.addWidget(lbl_path)
-        path_layout.addWidget(self.edit_path)
-        path_layout.addWidget(btn_browse)
-        main_layout.addLayout(path_layout)
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #f0f0f0;
+                border: 1px solid #dcdcdc;
+            }
+        """)
 
-        # 设置默认下载目录为项目根目录下的 ./download
-        project_dir = os.path.dirname(os.path.abspath(__file__))
-        default_download_dir = os.path.join(project_dir, 'download')
-        self.edit_path.setText(default_download_dir)
-
-        # ——— 第 3 行：格式选择 ———
-        fmt_layout = QHBoxLayout()
-        lbl_fmt = QLabel("下载格式：")
-        lbl_fmt.setMinimumWidth(70)
-        self.combo_fmt = QComboBox()
-        self.combo_fmt.addItems(["视频+音频 (默认)", "仅音频 (mp3)"])
-        fmt_layout.addWidget(lbl_fmt)
-        fmt_layout.addWidget(self.combo_fmt)
-        fmt_layout.addStretch(1)
-        main_layout.addLayout(fmt_layout)
-
-        # ——— 第 4 行：开始下载按钮 ———
-        btn_layout = QHBoxLayout()
-        self.btn_download = QPushButton("开始下载")
-        self.btn_download.setFixedHeight(32)
-        self.btn_download.clicked.connect(self.on_download)
-        btn_layout.addStretch(1)
-        btn_layout.addWidget(self.btn_download)
-        btn_layout.addStretch(1)
-        main_layout.addLayout(btn_layout)
-
-        # ——— 第 5 区：日志输出 ———
-        lbl_log = QLabel("下载日志：")
-        self.text_log = QTextEdit()
-        self.text_log.setReadOnly(True)
-        main_layout.addWidget(lbl_log)
-        main_layout.addWidget(self.text_log, stretch=1)
-
-        # ——— 第 6 区：进度条 ———
-        self.progress = QProgressBar()
-        self.progress.setRange(0, 100)
-        self.progress.setValue(0)
-        self.progress.setTextVisible(True)
-        main_layout.addWidget(self.progress)
-
-        # 保存当前下载线程的引用，防止被垃圾回收
-        self.download_thread = None
-
-    @pyqtSlot()
-    def on_browse(self):
+    def closeEvent(self, event):
         """
-        打开文件夹选择对话框，让用户选择下载保存目录。
+        窗口关闭事件，保存下载记录。
         """
-        directory = QFileDialog.getExistingDirectory(
-            self, "选择保存目录", os.getcwd(),
-            QFileDialog.Option.ShowDirsOnly | QFileDialog.Option.DontResolveSymlinks
-        )
-        if directory:
-            self.edit_path.setText(directory)
-
-    @pyqtSlot()
-    def on_download(self):
-        """
-        “开始下载”按钮的槽函数：
-        - 验证输入
-        - 禁用按钮，清空日志、重置进度条
-        - 启动 DownloadThread
-        """
-        url = self.edit_url.text().strip()
-        save_path = self.edit_path.text().strip()
-        fmt_index = self.combo_fmt.currentIndex()  # 0: 视频+音频，1: 仅音频
-
-        if not url:
-            QMessageBox.warning(self, "提示", "请先输入视频 URL。")
-            return
-        if not save_path:
-            QMessageBox.warning(self, "提示", "请先选择保存目录。")
-            return
-
-        # 禁用按钮，防止重复点击
-        self.btn_download.setEnabled(False)
-        # 清空日志
-        self.text_log.clear()
-        # 重置进度条
-        self.progress.setValue(0)
-
-        # 创建并启动后台下载线程
-        audio_only = (fmt_index == 1)
-        self.download_thread = DownloadThread(url, save_path, audio_only)
-
-        # 连接信号
-        self.download_thread.log_signal.connect(self.append_log)
-        self.download_thread.progress_signal.connect(self.progress.setValue)
-        self.download_thread.finished_signal.connect(self.on_finished)
-
-        self.download_thread.start()
-
-    @pyqtSlot(str)
-    def append_log(self, message: str):
-        """
-        接收到下载线程发射的日志后，追加到 QTextEdit 中。
-        """
-        self.text_log.append(message)
-
-    @pyqtSlot(bool, str)
-    def on_finished(self, success: bool, info: str):
-        """
-        下载线程结束时回调：
-        - 把按钮重新启用
-        - 弹窗提示结果（可选）
-        """
-        if success:
-            self.text_log.append("\n=== 下载成功 ===")
-            QMessageBox.information(self, "提示", "下载完成！")
-        else:
-            self.text_log.append(f"\n=== 下载失败: {info} ===")
-            QMessageBox.critical(self, "错误", f"下载失败：{info}")
-        self.btn_download.setEnabled(True)
+        self.top_tool_bar_task_list.save_download_records_on_app_exit()
+        super().closeEvent(event)

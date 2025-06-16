@@ -1,0 +1,4 @@
+PyQt6~=6.9.0
+yt-dlp~=2025.5.22
+CairoSVG~=2.8.2
+pillow~=11.2.1
