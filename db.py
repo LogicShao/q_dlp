@@ -111,11 +111,4 @@ def _insert_test_data():
 
 
 if __name__ == '__main__':
-    init_db()
     clear_downloads_at_db()
-    _insert_test_data()
-
-    print("所有下载记录：")
-    download_history = get_all_downloads_at_db()
-    for record in download_history:
-        print(record)

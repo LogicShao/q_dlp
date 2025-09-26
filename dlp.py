@@ -1,7 +1,14 @@
 import os
+import re
 
 from PyQt6.QtCore import QThread, pyqtSignal
 from yt_dlp import YoutubeDL
+
+
+def clean_ansi_codes(text: str) -> str:
+    """清理文本中的ANSI颜色代码和控制字符"""
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
 
 
 class DownloadThread(QThread):
@@ -35,10 +42,13 @@ class DownloadThread(QThread):
         def hook(d):
             status = d.get('status')
             if status == 'downloading':
-                # d['_percent_str'] 类似 " 12.3%"
-                percent_str = d.get('_percent_str', '').strip()
+                # 清理ANSI颜色代码
+                percent_str = clean_ansi_codes(d.get('_percent_str', '')).strip()
+                speed_str = clean_ansi_codes(d.get('_speed_str', ''))
+                eta_str = clean_ansi_codes(d.get('_eta_str', ''))
+                
                 self.log_signal.emit(
-                    f"[下载中] {percent_str} | 速度: {d.get('_speed_str', '')} | 剩余: {d.get('_eta_str', '')}")
+                    f"[下载中] {percent_str} | 速度: {speed_str} | 剩余: {eta_str}")
                 try:
                     percent_float = d.get('_percent_float', 0.0)
                     self.progress_signal.emit(int(percent_float))

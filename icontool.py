@@ -38,5 +38,6 @@ def convert_svg_to_ico(svg_path, ico_path=None, sizes=None):
     print(f"✅ 成功生成图标: {ico_path}")
 
 
-svg_path = "icon/run.svg"
-convert_svg_to_ico(svg_path, sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+if __name__ == "__main__":
+    svg_path = "icon/run.svg"
+    convert_svg_to_ico(svg_path, sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])

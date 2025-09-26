@@ -1,0 +1,218 @@
+/* 深色主题样式 */
+QMainWindow {
+    background-color: #2d2d2d;
+    color: #e0e0e0;
+}
+
+/* 工具栏样式 */
+#toolbar QToolBar {
+    background-color: #3a3a3a;
+    border-bottom: 1px solid #4a4a4a;
+    padding: 4px;
+    color: #e0e0e0;
+}
+
+/* 按钮样式 */
+QToolButton {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #e0e0e0;
+}
+
+QToolButton:hover {
+    background-color: #4a4a4a;
+}
+
+QToolButton:pressed {
+    background-color: #5a5a5a;
+}
+
+/* 列表控件样式 */
+#DListWidget {
+    background-color: #3a3a3a;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    padding: 4px;
+    font-family: "Microsoft YaHei", sans-serif;
+    font-size: 12px;
+    color: #e0e0e0;
+}
+
+#DListWidget::item {
+    padding: 6px;
+    border-bottom: 1px solid #4a4a4a;
+    color: #e0e0e0;
+}
+
+#DListWidget::item:hover {
+    background-color: #4a4a4a;
+}
+
+#DListWidget::item:selected {
+    background-color: #0066cc;
+    color: #ffffff;
+}
+
+/* 对话框样式 */
+QDialog {
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+}
+
+QLabel {
+    color: #e0e0e0;
+}
+
+QLineEdit {
+    background-color: #4a4a4a;
+    border: 1px solid #5a5a5a;
+    border-radius: 4px;
+    padding: 6px;
+    font-size: 12px;
+    color: #e0e0e0;
+    selection-background-color: #0066cc;
+    selection-color: #ffffff;
+}
+
+QLineEdit:focus {
+    border: 1px solid #0066cc;
+}
+
+QDialogButtonBox {
+    button-layout: 2; /* MacLayout */
+}
+
+QPushButton {
+    background-color: #4a4a4a;
+    border: 1px solid #5a5a5a;
+    border-radius: 4px;
+    padding: 6px 12px;
+    min-width: 60px;
+    color: #e0e0e0;
+}
+
+QPushButton:hover {
+    background-color: #5a5a5a;
+}
+
+QPushButton:pressed {
+    background-color: #6a6a6a;
+}
+
+QPushButton:focus {
+    outline: none;
+}
+
+QPushButton:disabled {
+    background-color: #3a3a3a;
+    color: #7a7a7a;
+}
+
+/* 组合框样式 */
+QComboBox {
+    background-color: #4a4a4a;
+    border: 1px solid #5a5a5a;
+    border-radius: 4px;
+    padding: 3px;
+    min-width: 6em;
+    color: #e0e0e0;
+}
+
+QComboBox:hover {
+    background-color: #5a5a5a;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 15px;
+    border-left-width: 1px;
+    border-left-color: #5a5a5a;
+    border-left-style: solid;
+    border-top-right-radius: 3px;
+    border-bottom-right-radius: 3px;
+}
+
+QComboBox::down-arrow {
+    image: url(icon/down_arrow_light.png);
+    width: 10px;
+    height: 10px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #4a4a4a;
+    border: 1px solid #5a5a5a;
+    selection-background-color: #0066cc;
+    selection-color: #ffffff;
+    color: #e0e0e0;
+}
+
+/* 进度条样式 */
+QProgressBar {
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    text-align: center;
+    background-color: #3a3a3a;
+    color: #e0e0e0;
+}
+
+QProgressBar::chunk {
+    background-color: #0066cc;
+    border-radius: 3px;
+}
+
+/* 状态栏样式 */
+QStatusBar {
+    background-color: #3a3a3a;
+    border-top: 1px solid #4a4a4a;
+    color: #e0e0e0;
+}
+
+QStatusBar QLabel {
+    color: #e0e0e0;
+}
+
+/* 滚动条样式 */
+QScrollBar:vertical {
+    border: none;
+    background-color: #3a3a3a;
+    width: 10px;
+    margin: 0px 0px 0px 0px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #5a5a5a;
+    min-height: 20px;
+    border-radius: 4px;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    background: none;
+}
+
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+}
+
+QScrollBar:horizontal {
+    border: none;
+    background-color: #3a3a3a;
+    height: 10px;
+    margin: 0px 0px 0px 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #5a5a5a;
+    min-width: 20px;
+    border-radius: 4px;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    background: none;
+}
+
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal {
+    background: none;
+}
