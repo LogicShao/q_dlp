@@ -121,7 +121,8 @@ class AddTaskDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("添加下载任务")
-        self.setWindowIcon(QIcon(os.path.join(os.path.dirname(__file__), 'icon', 'add.ico')))
+        self.setWindowIcon(
+            QIcon(os.path.join(os.path.dirname(__file__), 'icon', 'add.ico')))
         self.resize(400, 150)
 
         layout = QVBoxLayout()
@@ -144,9 +145,12 @@ class AddTaskDialog(QDialog):
 
         # 按钮组
         button_box = QDialogButtonBox()
-        self.add_button = button_box.addButton("添加到队列", QDialogButtonBox.ButtonRole.AcceptRole)
-        self.download_button = button_box.addButton("立即下载", QDialogButtonBox.ButtonRole.ApplyRole)
-        self.cancel_button = button_box.addButton("取消", QDialogButtonBox.ButtonRole.RejectRole)
+        self.add_button = button_box.addButton(
+            "添加到队列", QDialogButtonBox.ButtonRole.AcceptRole)
+        self.download_button = button_box.addButton(
+            "立即下载", QDialogButtonBox.ButtonRole.ApplyRole)
+        self.cancel_button = button_box.addButton(
+            "取消", QDialogButtonBox.ButtonRole.RejectRole)
 
         # 布局
         layout.addLayout(url_layout)
@@ -157,7 +161,7 @@ class AddTaskDialog(QDialog):
         # 连接信号
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
-        
+
         # 单独处理立即下载按钮
         button_box.clicked.connect(self.handle_button_click)
 
@@ -177,13 +181,13 @@ class AddTaskDialog(QDialog):
 
         # 判断是否仅音频
         audio_only = self.get_format() == "仅音频"
-        
+
         # 获取主窗口并调用下载函数
         main_window = self.parent()
         # 确保找到正确的MainWindow实例
         while main_window and not hasattr(main_window, 'start_download'):
             main_window = main_window.parent()
-        
+
         if main_window and hasattr(main_window, 'start_download'):
             try:
                 main_window.start_download(url, audio_only)
@@ -217,10 +221,14 @@ class MToolbarWidget(QWidget):
 
         # 创建动作
         self.add_task_action = QAction(QIcon.fromTheme("list-add"), "添加", self)
-        self.run_task_action = QAction(QIcon.fromTheme("media-playback-start"), "开始", self)
-        self.pause_task_action = QAction(QIcon.fromTheme("media-playback-pause"), "暂停", self)
-        self.remove_task_action = QAction(QIcon.fromTheme("edit-delete"), "删除", self)
-        self.clear_task_action = QAction(QIcon.fromTheme("edit-clear"), "清空", self)
+        self.run_task_action = QAction(
+            QIcon.fromTheme("media-playback-start"), "开始", self)
+        self.pause_task_action = QAction(
+            QIcon.fromTheme("media-playback-pause"), "暂停", self)
+        self.remove_task_action = QAction(
+            QIcon.fromTheme("edit-delete"), "删除", self)
+        self.clear_task_action = QAction(
+            QIcon.fromTheme("edit-clear"), "清空", self)
 
         # 添加动作到工具栏
         toolbar.addAction(self.add_task_action)
@@ -232,12 +240,15 @@ class MToolbarWidget(QWidget):
 
         # 添加伸缩空间
         spacer = QWidget()
-        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding,
+                             QSizePolicy.Policy.Preferred)
         toolbar.addWidget(spacer)
 
         # 右侧按钮
-        self.settings_action = QAction(QIcon.fromTheme("preferences-system"), "设置", self)
-        self.help_action = QAction(QIcon.fromTheme("help-contents"), "帮助", self)
+        self.settings_action = QAction(
+            QIcon.fromTheme("preferences-system"), "设置", self)
+        self.help_action = QAction(
+            QIcon.fromTheme("help-contents"), "帮助", self)
 
         toolbar.addAction(self.settings_action)
         toolbar.addAction(self.help_action)
@@ -282,7 +293,8 @@ class MToolbarWidget(QWidget):
                 try:
                     # 判断是否为仅音频下载（根据格式选择）
                     audio_only = False  # 这里可以根据实际需求调整
-                    self.main_window.start_download(first_record.url, audio_only)
+                    self.main_window.start_download(
+                        first_record.url, audio_only)
                 except Exception as e:
                     QMessageBox.warning(self, "错误", f"下载功能调用失败: {e}")
             else:
@@ -292,7 +304,7 @@ class MToolbarWidget(QWidget):
         # 下载选中的第一个任务
         selected_item = selected_items[0]
         item_text = selected_item.text()
-        
+
         # 从任务列表中找到对应的记录
         item_row = self.task_list.row(selected_item)
         if 0 <= item_row < len(self.task_list.download_records):
@@ -355,7 +367,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("B站视频下载器")
-        icon_path = os.path.join(os.path.dirname(__file__), 'icon', 'q_dlp.ico')
+        icon_path = os.path.join(
+            os.path.dirname(__file__), 'icon', 'q_dlp.ico')
         self.setWindowIcon(QIcon(icon_path))
         self.resize(800, 600)
 
@@ -381,7 +394,8 @@ class MainWindow(QMainWindow):
         self.path_edit = QLineEdit()
         self.path_edit.setPlaceholderText("选择下载保存路径...")
         # 设置默认路径为项目根目录下的download文件夹
-        default_download_path = os.path.join(os.path.dirname(__file__), 'download')
+        default_download_path = os.path.join(
+            os.path.dirname(__file__), 'download')
         self.path_edit.setText(default_download_path)
         browse_button = QPushButton("浏览...")
         browse_button.clicked.connect(self.browse_download_path)
@@ -455,7 +469,7 @@ class MainWindow(QMainWindow):
 
         # 创建并启动下载线程
         self.download_thread = DownloadThread(url, download_path, audio_only)
-        
+
         # 连接信号
         self.download_thread.log_signal.connect(self.on_log_update)
         self.download_thread.progress_signal.connect(self.on_progress_update)
@@ -466,10 +480,10 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.log_text.clear()
         self.status_bar.showMessage(f"正在下载: {url}")
-        
+
         # 启动线程
         self.download_thread.start()
-        
+
         # 记录到日志
         self.log_text.append(f"[开始下载] {url}")
         logging.info(f"开始下载: {url}, 保存路径: {download_path}, 仅音频: {audio_only}")
@@ -491,7 +505,7 @@ class MainWindow(QMainWindow):
     def on_download_finished(self, success: bool, message: str):
         """处理下载完成"""
         self.is_downloading = False
-        
+
         if success:
             self.log_text.append(f"[成功] {message}")
             self.status_bar.showMessage("下载完成")
@@ -500,7 +514,7 @@ class MainWindow(QMainWindow):
             self.log_text.append(f"[失败] {message}")
             self.status_bar.showMessage("下载失败")
             QMessageBox.critical(self, "下载失败", f"下载失败:\n{message}")
-        
+
         # 清理下载线程
         if self.download_thread:
             self.download_thread.deleteLater()
@@ -517,11 +531,11 @@ class MainWindow(QMainWindow):
                 '当前有下载任务正在进行，确定要退出吗？\n（退出将中断下载）',
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No)
-            
+
             if reply == QMessageBox.StandardButton.No:
                 event.ignore()
                 return
-            
+
             # 中断下载线程
             if self.download_thread and self.download_thread.isRunning():
                 self.download_thread.terminate()
