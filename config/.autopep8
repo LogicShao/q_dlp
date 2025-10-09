@@ -1,0 +1,18 @@
+[tool:autopep8]
+max_line_length = 88
+aggressive = 1
+in-place = true
+recursive = true
+exclude = .venv,__pycache__,.git,.idea,.vscode,build,dist,temp
+
+# PEP 8 规范配置
+# max_line_length: 最大行长度，88比79更适合现代显示器
+# aggressive: 激进程度，1表示应用大部分修复，但保持相对保守
+# in-place: 直接修改文件而不是输出到stdout
+# recursive: 递归处理目录
+# exclude: 排除的目录和文件模式
+
+# 详细说明:
+# aggressive = 0: 只修复明显的空白符问题
+# aggressive = 1: 修复更多格式问题，如E711, E712等
+# aggressive = 2: 修复所有可能的问题，可能改变代码逻辑，需谨慎使用

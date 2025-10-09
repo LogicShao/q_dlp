@@ -2,10 +2,10 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['../src/main.py'],
     pathex=[],
     binaries=[],
-    datas=[('icon', 'icon'), ('download', 'download')],
+    datas=[('../icon', 'icon'), ('../config', 'config'), ('../download', 'download')],
     hiddenimports=['PyQt6.QtCore', 'PyQt6.QtGui', 'PyQt6.QtWidgets', 'yt_dlp', 'sqlite3'],
     hookspath=[],
     hooksconfig={},

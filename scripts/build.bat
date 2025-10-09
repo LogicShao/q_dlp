@@ -5,6 +5,9 @@ echo       Q_DLP 项目构建脚本
 echo =====================================
 echo.
 
+:: 切换到项目根目录
+cd /d "%~dp0\.."
+
 :: 检查虚拟环境
 if not exist ".venv" (
     echo ❌ 未找到虚拟环境，请先运行: python -m venv .venv
@@ -18,7 +21,8 @@ call .venv\Scripts\activate
 
 :: 检查依赖
 echo 🔄 检查并安装依赖...
-pip install -r requirements.txt
+# 检查并安装依赖...
+pip install -r config/requirements.txt
 if %ERRORLEVEL% neq 0 (
     echo ❌ 依赖安装失败
     pause
@@ -48,13 +52,14 @@ pyinstaller ^
     --name=Q_DLP ^
     --icon=icon/q_dlp.ico ^
     --add-data="icon;icon" ^
+    --add-data="config;config" ^
     --add-data="download;download" ^
     --hidden-import=PyQt6.QtCore ^
     --hidden-import=PyQt6.QtGui ^
     --hidden-import=PyQt6.QtWidgets ^
     --hidden-import=yt_dlp ^
     --hidden-import=sqlite3 ^
-    main.py
+    src/main.py
 
 if %ERRORLEVEL% neq 0 (
     echo ❌ 打包失败

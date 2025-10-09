@@ -1,0 +1,29 @@
+{
+    "download": {
+        "default_path": "D:\\proj\\q_dlp\\download",
+        "video_quality": "720p",
+        "audio_quality": "best",
+        "format": "mp4",
+        "audio_format": "mp3",
+        "subtitle": false,
+        "thumbnail": true
+    },
+    "network": {
+        "proxy": "",
+        "timeout": 26,
+        "retry_times": 3,
+        "concurrent_downloads": 1
+    },
+    "ui": {
+        "theme": "dark",
+        "language": "en_US",
+        "show_log": true,
+        "auto_clear_log": true
+    },
+    "advanced": {
+        "use_cookies": false,
+        "cookies_file": "",
+        "user_agent": "",
+        "extract_audio": false
+    }
+}

@@ -45,7 +45,7 @@ def get_db_connection():
 def _check_table_exists(cursor, table_name: str) -> bool:
     """检查表是否存在"""
     cursor.execute("""
-        SELECT name FROM sqlite_master 
+        SELECT name FROM sqlite_master
         WHERE type='table' AND name=?
     """, (table_name,))
     return cursor.fetchone() is not None
@@ -70,26 +70,26 @@ def _migrate_database(conn) -> bool:
             # 添加缺失的列（使用常量默认值）
             if 'created_at' not in existing_columns:
                 cursor.execute("""
-                    ALTER TABLE downloads 
+                    ALTER TABLE downloads
                     ADD COLUMN created_at TEXT DEFAULT ''
                 """)
                 # 更新现有记录的created_at值
                 cursor.execute("""
-                    UPDATE downloads 
-                    SET created_at = ? 
+                    UPDATE downloads
+                    SET created_at = ?
                     WHERE created_at = '' OR created_at IS NULL
                 """, (current_time,))
                 logging.info("添加 created_at 列")
 
             if 'updated_at' not in existing_columns:
                 cursor.execute("""
-                    ALTER TABLE downloads 
+                    ALTER TABLE downloads
                     ADD COLUMN updated_at TEXT DEFAULT ''
                 """)
                 # 更新现有记录的updated_at值
                 cursor.execute("""
-                    UPDATE downloads 
-                    SET updated_at = ? 
+                    UPDATE downloads
+                    SET updated_at = ?
                     WHERE updated_at = '' OR updated_at IS NULL
                 """, (current_time,))
                 logging.info("添加 updated_at 列")
@@ -133,10 +133,10 @@ def init_db() -> bool:
                 # 如果已存在重复URL，先清理重复项
                 logging.warning("检测到重复URL，正在清理...")
                 cursor.execute("""
-                    DELETE FROM downloads 
+                    DELETE FROM downloads
                     WHERE id NOT IN (
-                        SELECT MIN(id) 
-                        FROM downloads 
+                        SELECT MIN(id)
+                        FROM downloads
                         GROUP BY url
                     )
                 """)
@@ -173,7 +173,7 @@ def insert_download(url: str, title: str = "", file_path: str = "",
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR IGNORE INTO downloads 
+                INSERT OR IGNORE INTO downloads
                 (url, title, file_path, platform, download_time, is_finished, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
@@ -200,7 +200,7 @@ def update_download_status(url: str, is_finished: bool, file_path: str = "") -> 
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                UPDATE downloads 
+                UPDATE downloads
                 SET is_finished = ?, file_path = ?, updated_at = ?
                 WHERE url = ?
             """, (is_finished, file_path, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), url))
@@ -377,7 +377,7 @@ def search_downloads(keyword: str) -> List[DownloadRecord]:
             cursor = conn.cursor()
             search_term = f"%{keyword.strip()}%"
             cursor.execute("""
-                SELECT * FROM downloads 
+                SELECT * FROM downloads
                 WHERE title LIKE ? OR url LIKE ? OR platform LIKE ?
                 ORDER BY created_at DESC
             """, (search_term, search_term, search_term))
@@ -405,9 +405,9 @@ def get_download_stats() -> dict:
 
             # 各平台统计
             cursor.execute("""
-                SELECT platform, COUNT(*) 
-                FROM downloads 
-                WHERE platform != '' 
+                SELECT platform, COUNT(*)
+                FROM downloads
+                WHERE platform != ''
                 GROUP BY platform
             """)
             platform_stats = dict(cursor.fetchall())
