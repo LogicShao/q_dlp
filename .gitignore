@@ -1,8 +1,10 @@
-.venv
+.venv/
 __pycache__
-.idea
-.vscode
-download
-build
-dist
-temp
+.idea/
+.vscode/
+download/
+build/
+dist/
+temp/
+.claude/
+*.db

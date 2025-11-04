@@ -47,12 +47,17 @@ pyinstaller \
     --icon=icon/q_dlp.ico \
     --add-data="icon:icon" \
     --add-data="config:config" \
-    --add-data="download:download" \
+    --add-data="assets:assets" \
     --hidden-import=PyQt6.QtCore \
     --hidden-import=PyQt6.QtGui \
     --hidden-import=PyQt6.QtWidgets \
+    --hidden-import=qfluentwidgets \
+    --hidden-import=qfluentwidgets.common \
+    --hidden-import=qfluentwidgets.components \
+    --hidden-import=qfluentwidgets.window \
     --hidden-import=yt_dlp \
     --hidden-import=sqlite3 \
+    --collect-all=qfluentwidgets \
     src/main.py
 
 if [ $? -ne 0 ]; then
