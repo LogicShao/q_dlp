@@ -1,6 +1,6 @@
 {
     "download": {
-        "default_path": "D:\\proj\\q_dlp\\download",
+        "default_path": "./download",
         "video_quality": "720p",
         "audio_quality": "best",
         "format": "mp4",

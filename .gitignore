@@ -8,3 +8,4 @@ dist/
 temp/
 .claude/
 *.db
+src/config.json

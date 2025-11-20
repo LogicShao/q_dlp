@@ -1,9 +1,9 @@
 import os
 import re
+from typing import Dict, Any
 
 from PyQt6.QtCore import QThread, pyqtSignal
 from yt_dlp import YoutubeDL
-from typing import Dict, Any
 
 
 def clean_ansi_codes(text: str) -> str:
@@ -21,8 +21,8 @@ class DownloadThread(QThread):
     log_signal = pyqtSignal(str)
     # 用于更新进度条（整数，0~100）
     progress_signal = pyqtSignal(int)
-    # 用于告知下载结束（bool: 是否成功, str: 信息）
-    finished_signal = pyqtSignal(bool, str)
+    # 用于告知下载结束（bool: 是否成功, str: 信息, str: 文件路径）
+    finished_signal = pyqtSignal(bool, str, str)
 
     def __init__(self, url: str, path: str, audio_only: bool = False, config: Dict[str, Any] = None):
         super().__init__()
@@ -30,6 +30,7 @@ class DownloadThread(QThread):
         self.path = path
         self.audio_only = audio_only
         self.config = config or {}
+        self.downloaded_file_path = ""  # 记录下载的文件路径
 
     def run(self):
         # 1. 确保下载目录存在
@@ -38,7 +39,7 @@ class DownloadThread(QThread):
                 os.makedirs(self.path, exist_ok=True)
             except Exception as e:
                 self.log_signal.emit(f"[错误] 无法创建下载目录: {e}")
-                self.finished_signal.emit(False, f"无法创建下载目录: {e}")
+                self.finished_signal.emit(False, f"无法创建下载目录: {e}", "")
                 return
 
         def hook(d):
@@ -50,17 +51,43 @@ class DownloadThread(QThread):
                 speed_str = clean_ansi_codes(d.get('_speed_str', ''))
                 eta_str = clean_ansi_codes(d.get('_eta_str', ''))
 
+                # 计算进度百分比
+                progress_percent = 0
+                try:
+                    # 优先使用 downloaded_bytes 和 total_bytes 计算精确进度
+                    downloaded = d.get('downloaded_bytes', 0)
+                    total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
+
+                    if total > 0:
+                        progress_percent = int((downloaded / total) * 100)
+                    else:
+                        # 回退到使用 _percent_float
+                        percent_float = d.get('_percent_float', 0.0)
+                        # 判断是否为 0-1 之间的小数,如果是则乘以 100
+                        if 0 < percent_float <= 1:
+                            progress_percent = int(percent_float * 100)
+                        else:
+                            progress_percent = int(percent_float)
+                except Exception:
+                    progress_percent = 0
+
                 self.log_signal.emit(
                     f"[下载中] {percent_str} | 速度: {speed_str} | 剩余: {eta_str}")
-                try:
-                    percent_float = d.get('_percent_float', 0.0)
-                    self.progress_signal.emit(int(percent_float))
-                except Exception:
-                    pass
+                self.progress_signal.emit(progress_percent)
             elif status == 'finished':
                 filename = d.get('filename', '')
-                self.log_signal.emit(f"[完成] 文件保存为: {filename}")
+                # 这里只是下载完成,可能还需要后处理
+                self.log_signal.emit(f"[下载完成] 文件: {filename}")
                 self.progress_signal.emit(100)
+
+        def postprocessor_hook(d):
+            """后处理钩子,获取最终处理后的文件路径"""
+            if d.get('status') == 'finished':
+                # 后处理完成,这才是最终文件
+                final_file = d.get('info_dict', {}).get('filepath') or d.get('filepath', '')
+                if final_file:
+                    self.downloaded_file_path = final_file
+                    self.log_signal.emit(f"[处理完成] 最终文件: {final_file}")
 
         # 从配置获取设置
         download_config = self.config.get('download', {})
@@ -71,6 +98,7 @@ class DownloadThread(QThread):
             'outtmpl': os.path.join(self.path, '%(title)s.%(ext)s'),
             'noplaylist': True,
             'progress_hooks': [hook],
+            'postprocessor_hooks': [postprocessor_hook],  # 添加后处理钩子
             'quiet': True,
             'no_warnings': True,
         }
@@ -144,9 +172,18 @@ class DownloadThread(QThread):
 
         try:
             with YoutubeDL(ydl_opts) as ydl:
-                ydl.download([self.url])
+                info = ydl.extract_info(self.url, download=True)
+                # 如果没有通过postprocessor_hook获取到路径,尝试从info中获取
+                if not self.downloaded_file_path:
+                    if info:
+                        # 尝试多种方式获取最终文件路径
+                        self.downloaded_file_path = (
+                                info.get('filepath') or
+                                info.get('requested_downloads', [{}])[0].get('filepath') or
+                                ydl.prepare_filename(info)
+                        )
             # 下载成功
-            self.finished_signal.emit(True, "下载完成")
+            self.finished_signal.emit(True, "下载完成", self.downloaded_file_path)
         except Exception as e:
             self.log_signal.emit(f"[错误] 下载失败: {e}")
-            self.finished_signal.emit(False, f"下载失败: {e}")
+            self.finished_signal.emit(False, f"下载失败: {e}", "")

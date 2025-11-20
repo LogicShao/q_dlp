@@ -1,15 +1,15 @@
 import logging
 import os
 import re
+import subprocess
+import sys
 from typing import Optional
 
-from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtGui import QIcon, QFont
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QIcon, QFont, QAction
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QDialog, QLabel,
-    QFormLayout, QGroupBox, QFileDialog
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QFileDialog, QMenu
 )
-
 # Fluent Widgets 导入
 from qfluentwidgets import (
     FluentWindow, NavigationItemPosition, setTheme, Theme,
@@ -17,16 +17,12 @@ from qfluentwidgets import (
     ProgressBar, TextEdit, ComboBox, CheckBox, SpinBox,
     MessageBox, Dialog, SmoothScrollArea, BodyLabel,
     SubtitleLabel, TitleLabel, FluentIcon as FIF,
-    ToolButton, CommandBar, Action, TransparentToolButton,
-    InfoBar, InfoBarPosition, StateToolTip, SegmentedWidget,
-    CardWidget, TabBar, SettingCardGroup, ExpandSettingCard,
-    RangeSettingCard, SwitchSettingCard, OptionsSettingCard,
-    PushSettingCard, ScrollArea, setThemeColor
+    InfoBar, InfoBarPosition, StateToolTip, CardWidget, MessageBoxBase
 )
 
 from db import DownloadRecord, clear_downloads_at_db, get_all_downloads_at_db
 from dlp import DownloadThread
-from utils import load_config, save_config, get_config_value, set_config_value, get_icon_path
+from utils import load_config, save_config, get_icon_path
 
 
 def clean_ansi_codes(text: str) -> str:
@@ -86,10 +82,15 @@ class DownloadTaskListWidget(ListWidget):
         font.setPointSize(10)
         self.setFont(font)
 
+        # 启用右键菜单
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.show_context_menu)
+
         self.download_records: list[DownloadRecord] = []
         for record in get_all_downloads_at_db():
             self.download_records.append(record)
-            self.addItem(f"[已加载] {record.url}")
+            status_text = "[已完成]" if record.is_finished else "[已加载]"
+            self.addItem(f"{status_text} {record.url}")
         clear_downloads_at_db()
         logging.info("已加载下载记录: %d 条", len(self.download_records))
 
@@ -126,6 +127,261 @@ class DownloadTaskListWidget(ListWidget):
                 logging.info("已保存下载记录: %s", record)
             except Exception as e:
                 logging.error("保存下载记录失败: %s", e)
+
+    def show_context_menu(self, position):
+        """显示右键菜单"""
+        # 获取选中的项
+        item = self.itemAt(position)
+        if not item:
+            return
+
+        # 获取对应的下载记录
+        row = self.row(item)
+        if row < 0 or row >= len(self.download_records):
+            return
+
+        record = self.download_records[row]
+
+        # 创建菜单
+        menu = QMenu(self)
+
+        # 只有已完成且文件存在的才显示打开选项
+        if record.is_finished and record.file_path and os.path.exists(record.file_path):
+            # 在资源管理器中打开
+            open_in_explorer_action = QAction("在资源管理器中打开", self)
+            open_in_explorer_action.triggered.connect(
+                lambda: self.open_in_explorer(record.file_path))
+            menu.addAction(open_in_explorer_action)
+
+            # 在对应软件中打开
+            open_with_app_action = QAction("在默认软件中打开", self)
+            open_with_app_action.triggered.connect(
+                lambda: self.open_with_default_app(record.file_path))
+            menu.addAction(open_with_app_action)
+
+            menu.addSeparator()
+
+        # 复制URL
+        copy_url_action = QAction("复制URL", self)
+        copy_url_action.triggered.connect(lambda: self.copy_url(record.url))
+        menu.addAction(copy_url_action)
+
+        menu.addSeparator()
+
+        # 删除任务
+        delete_action = QAction("删除任务", self)
+        delete_action.triggered.connect(lambda: self.delete_task(row, record))
+        menu.addAction(delete_action)
+
+        # 显示菜单
+        menu.exec(self.mapToGlobal(position))
+
+    def open_in_explorer(self, file_path: str):
+        """在资源管理器中打开文件所在目录并选中文件"""
+        if not os.path.exists(file_path):
+            InfoBar.error(
+                title='文件不存在',
+                content=f'文件未找到: {file_path}',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+
+        try:
+            if sys.platform == 'win32':
+                # Windows: 使用 explorer /select 选中文件
+                subprocess.run(['explorer', '/select,', os.path.normpath(file_path)])
+            elif sys.platform == 'darwin':
+                # macOS: 使用 open -R 选中文件
+                subprocess.run(['open', '-R', file_path])
+            else:
+                # Linux: 打开文件所在目录
+                subprocess.run(['xdg-open', os.path.dirname(file_path)])
+
+            logging.info(f"在资源管理器中打开: {file_path}")
+        except Exception as e:
+            logging.error(f"打开资源管理器失败: {e}")
+            InfoBar.error(
+                title='打开失败',
+                content=f'无法打开资源管理器: {e}',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+
+    def open_with_default_app(self, file_path: str):
+        """在默认软件中打开文件"""
+        if not os.path.exists(file_path):
+            InfoBar.error(
+                title='文件不存在',
+                content=f'文件未找到: {file_path}',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+
+        try:
+            if sys.platform == 'win32':
+                # Windows: 使用 os.startfile
+                os.startfile(file_path)
+            elif sys.platform == 'darwin':
+                # macOS: 使用 open
+                subprocess.run(['open', file_path])
+            else:
+                # Linux: 使用 xdg-open
+                subprocess.run(['xdg-open', file_path])
+
+            logging.info(f"在默认软件中打开: {file_path}")
+        except Exception as e:
+            logging.error(f"打开文件失败: {e}")
+            InfoBar.error(
+                title='打开失败',
+                content=f'无法打开文件: {e}',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+
+    def copy_url(self, url: str):
+        """复制URL到剪贴板"""
+        try:
+            from PyQt6.QtWidgets import QApplication
+            clipboard = QApplication.clipboard()
+            clipboard.setText(url)
+            InfoBar.success(
+                title='已复制',
+                content='URL已复制到剪贴板',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=1000,
+                parent=self
+            )
+            logging.info(f"已复制URL: {url}")
+        except Exception as e:
+            logging.error(f"复制URL失败: {e}")
+
+    def delete_task(self, row: int, record: DownloadRecord):
+        """删除任务"""
+        # 检查文件是否存在
+        file_exists = record.file_path and os.path.exists(record.file_path)
+
+        # 构建确认消息
+        if file_exists:
+            message = f"确定要删除此任务吗？\n\nURL: {record.url}\n\n文件路径: {record.file_path}\n\n是否同时删除本地文件？"
+
+            # 创建自定义对话框，提供三个选项
+            class DeleteConfirmDialog(MessageBoxBase):
+                def __init__(self, msg: str, parent=None):
+                    super().__init__(parent)
+                    self.titleLabel = SubtitleLabel('删除任务', self)
+                    self.contentLabel = BodyLabel(msg, self)
+                    self.contentLabel.setWordWrap(True)
+
+                    self.viewLayout.addWidget(self.titleLabel)
+                    self.viewLayout.addWidget(self.contentLabel)
+
+                    # 修改按钮文本
+                    self.yesButton.setText('仅删除任务')
+                    self.cancelButton.setText('取消')
+
+                    # 添加"删除任务和文件"按钮
+                    self.deleteFileButton = PrimaryPushButton('删除任务和文件', self)
+                    self.deleteFileButton.clicked.connect(self.accept_with_file)
+                    self.buttonLayout.insertWidget(0, self.deleteFileButton)
+
+                    self.delete_file = False
+
+                    # 设置对话框尺寸
+                    self.widget.setMinimumWidth(500)
+                    self.widget.setMinimumHeight(280)
+
+                    # 设置窗口置顶
+                    self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+
+                def accept_with_file(self):
+                    self.delete_file = True
+                    self.accept()
+
+            dialog = DeleteConfirmDialog(message, self)
+            if dialog.exec():
+                # 删除列表项
+                self.takeItem(row)
+
+                # 删除记录
+                if 0 <= row < len(self.download_records):
+                    self.download_records.pop(row)
+
+                # 如果选择删除文件
+                if dialog.delete_file and file_exists:
+                    try:
+                        os.remove(record.file_path)
+                        logging.info(f"已删除文件: {record.file_path}")
+                        InfoBar.success(
+                            title='删除成功',
+                            content='任务和文件已删除',
+                            orient=Qt.Orientation.Horizontal,
+                            isClosable=True,
+                            position=InfoBarPosition.TOP,
+                            duration=2000,
+                            parent=self
+                        )
+                    except Exception as e:
+                        logging.error(f"删除文件失败: {e}")
+                        InfoBar.warning(
+                            title='部分删除',
+                            content=f'任务已删除，但文件删除失败: {e}',
+                            orient=Qt.Orientation.Horizontal,
+                            isClosable=True,
+                            position=InfoBarPosition.TOP,
+                            duration=3000,
+                            parent=self
+                        )
+                else:
+                    InfoBar.success(
+                        title='已删除',
+                        content='任务已从队列中删除',
+                        orient=Qt.Orientation.Horizontal,
+                        isClosable=True,
+                        position=InfoBarPosition.TOP,
+                        duration=2000,
+                        parent=self
+                    )
+
+                logging.info(f"已删除任务: {record.url}")
+        else:
+            # 文件不存在，只需确认删除任务
+            w = MessageBox("确认删除", f"确定要删除此任务吗？\n\nURL: {record.url}", self)
+            if w.exec():
+                # 删除列表项
+                self.takeItem(row)
+
+                # 删除记录
+                if 0 <= row < len(self.download_records):
+                    self.download_records.pop(row)
+
+                InfoBar.success(
+                    title='已删除',
+                    content='任务已从队列中删除',
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
+
+                logging.info(f"已删除任务: {record.url}")
+
 
 
 class SettingsDialog(Dialog):
@@ -685,6 +941,7 @@ class MainWindow(FluentWindow):
         # 下载线程相关属性
         self.download_thread = None
         self.is_downloading = False
+        self.current_download_url = ""  # 当前正在下载的URL
 
         # 创建子界面
         self.downloadInterface = self.create_download_interface()
@@ -1032,6 +1289,7 @@ class MainWindow(FluentWindow):
 
         # 更新UI状态
         self.is_downloading = True
+        self.current_download_url = url  # 保存当前下载URL
         self.progress_bar.setValue(0)
         self.log_text.clear()
 
@@ -1062,9 +1320,27 @@ class MainWindow(FluentWindow):
         if hasattr(self, 'stateTooltip'):
             self.stateTooltip.setContent(f'下载进度: {progress}%')
 
-    def on_download_finished(self, success: bool, message: str):
+    def on_download_finished(self, success: bool, message: str, file_path: str = ""):
         """处理下载完成"""
         self.is_downloading = False
+
+        # 更新下载记录的文件路径
+        if success and file_path and self.current_download_url:
+            for record in self.task_list.download_records:
+                if record.url == self.current_download_url:
+                    record.file_path = file_path
+                    record.is_finished = True
+                    # 更新列表项显示
+                    for i in range(self.task_list.count()):
+                        item_text = self.task_list.item(i).text()
+                        if self.current_download_url in item_text:
+                            self.task_list.item(i).setText(f"[已完成] {record.url}")
+                            break
+                    logging.info(f"更新下载记录: {record.url} -> {file_path}")
+                    break
+
+        # 清除当前下载URL
+        self.current_download_url = ""
 
         # 关闭状态提示
         if hasattr(self, 'stateTooltip'):
